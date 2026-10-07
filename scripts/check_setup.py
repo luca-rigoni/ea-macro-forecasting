@@ -1,4 +1,4 @@
-"""Check that the Python environment is ready and the ECB Data Portal API is reachable.
+f"""Check that the Python environment is ready and the ECB Data Portal API is reachable.
 
 Run from the project root:  python scripts/check_setup.py
 """
@@ -14,7 +14,7 @@ REQUIRED_PACKAGES = [
 
 # Euro area HICP, overall index, annual rate of change (monthly)
 ECB_URL = (
-    "https://data-api.ecb.europa.eu/service/data/ICP/M.U2.N.000000.4.ANR"
+    "https://data-api.ecb.europa.eu/service/data/HICP/M.U2.N.000000.4D0.ANR"
     "?format=csvdata&lastNObservations=6"
 )
 
