@@ -20,3 +20,6 @@ dynare/*/
 # macOS and editors
 .DS_Store
 .vscode/
+
+# Personal practice notebooks
+notebooks/practice_*
