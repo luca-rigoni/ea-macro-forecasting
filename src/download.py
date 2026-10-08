@@ -17,9 +17,9 @@ SERIES = {
     "unemployment": {
         "flow": "LFSI",
         "key": "M.I10.S.UNEHRT.TOTAL0.15_74.T",
-        "description": "Seasonally adjusted rate, age 15-74, as a percentage of the workforce",
+        "description": "Unemployment rate, seasonally adjusted, age 15-74",
         "frequency": "M",
-        "unit": "percent",
+        "unit": "percent of labour force",
     },
     "euribor3m": {
         "flow": "FM",
