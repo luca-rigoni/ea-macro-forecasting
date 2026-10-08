@@ -2,6 +2,9 @@
 
 import sqlite3
 import pandas as pd
+from pathlib import Path
+
+DB_PATH = Path("data/processed/ea_macro.db")
 
 SCHEMA = """
     CREATE TABLE IF NOT EXISTS series (

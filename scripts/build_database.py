@@ -4,11 +4,8 @@ Run from the project root:  python -m scripts.build_database
 """
 
 from pathlib import Path
-from src.database import connect, save_series, save_observations
+from src.database import DB_PATH, connect, save_series, save_observations
 from src.download import SERIES, fetch_series
-
-# Relative path to the SQLite database file
-DB_PATH = Path("data/processed/ea_macro.db")
 
 
 def main():
