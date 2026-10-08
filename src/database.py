@@ -1,6 +1,7 @@
 """Store the downloaded series in a local SQLite database."""
 
 import sqlite3
+import pandas as pd
 
 SCHEMA = """
     CREATE TABLE IF NOT EXISTS series (
@@ -54,7 +55,7 @@ def save_series(connection, series_id, info):
 
 def save_observations(connection, series_id, data):
     """Insert the observations of a series; existing periods are overwritten."""
-    
+
     rows = [
         (series_id, period, value)
         for period, value in zip(data["period"], data["value"])
@@ -69,6 +70,17 @@ def save_observations(connection, series_id, data):
         rows,
     )
     return len(rows)
+
+def load_series(connection, series_id):
+    """Load the observations of a series from the database."""
+    query = """
+        SELECT period, value
+        FROM observations
+        WHERE series_id = ?
+        ORDER BY period
+    """
+    df = pd.read_sql_query(query, connection, params=(series_id,))
+    return df
 
 
 if __name__ == "__main__":
@@ -88,9 +100,13 @@ if __name__ == "__main__":
     connection.commit()
 
     # prints the number of observations saved for the HICP series
+    print("DB observations count:")
     print(
         connection.execute("SELECT COUNT(*) FROM observations").fetchone()
     )
+
+    print ("\nLast 5 months read from DB:")
+    print(load_series(connection, "hicp").tail())
 
     # closes the database connection
     connection.close()
