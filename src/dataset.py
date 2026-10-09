@@ -54,5 +54,4 @@ if __name__ == "__main__":
     print(df.head())
     print(df.tail())
     print(f"Total Rows: {len(df)}")
-    
-connection.close()
+    connection.close()
