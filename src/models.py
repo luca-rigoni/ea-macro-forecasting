@@ -9,6 +9,8 @@ from src.dataset import build_quarterly_dataset
 #Maximum number of lags to consider: 8 quarters = 2 years
 MAX_LAGS = 8
 
+TARGETS = ["gdp_growth", "inflation"]
+
 def forecast_ar(series: pd.Series, steps: int=8):
     """Select the lag order by BIC, fit an AR(p) model and forecast `steps` quarters ahead."""
 
@@ -24,6 +26,14 @@ def forecast_ar(series: pd.Series, steps: int=8):
     forecast = model_fit.forecast(steps=steps)
 
     return forecast, chosen_lags
+
+def ar_forecast(train: pd.DataFrame, steps: int) -> pd.DataFrame:
+    """Wrapper function to generate AR forecasts for all target variables."""
+    return pd.DataFrame({v: forecast_ar(train[v], steps)[0] for v in TARGETS})
+
+def random_walk_forecast(train, steps):
+    future = pd.period_range(train.index[-1] + 1, periods=steps, freq="Q")
+    return pd.DataFrame({v: [train[v].iloc[-1]] * steps for v in TARGETS}, index=future)
 
 if __name__ == "__main__":
     # 1. Connect to the database and build the quarterly dataset
