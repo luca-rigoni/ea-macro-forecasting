@@ -2,12 +2,16 @@
 
 import pandas as pd
 from statsmodels.tsa.ar_model import AutoReg, ar_select_order
+from statsmodels.tsa.api import VAR
 
 from src.database import connect, DB_PATH
 from src.dataset import build_quarterly_dataset
 
 #Maximum number of lags to consider: 8 quarters = 2 years
 MAX_LAGS = 8
+
+#Maximum lags for VAR (quarters)
+MAX_LAGS_VAR = 4
 
 TARGETS = ["gdp_growth", "inflation"]
 
@@ -34,6 +38,27 @@ def ar_forecast(train: pd.DataFrame, steps: int) -> pd.DataFrame:
 def random_walk_forecast(train, steps):
     future = pd.period_range(train.index[-1] + 1, periods=steps, freq="Q")
     return pd.DataFrame({v: [train[v].iloc[-1]] * steps for v in TARGETS}, index=future)
+
+def var_forecast(train: pd.DataFrame, steps: int) -> pd.DataFrame:
+    """Estimates a VAR(p) model with lag length selected by BIC and generates out-of sample forecasts for all target variables."""
+
+    #1 Inizialize VAR object using all 4 dataset columns
+    model = VAR(train)
+
+    #2 Select the optimal lag structure based on BIC criterion (forcing at least 1 lag)
+    selected_order = model.select_order(MAX_LAGS_VAR)
+    lags = max(1, selected_order.bic)
+
+   #3 Estimates equations' parameters via OLS
+    results = model.fit(lags)
+
+    #4 Generates forecasts for the "steps" number of periods ahead 
+    values = results.forecast(train.values[-lags:], steps=steps)
+
+    #5 Builds future index and returns a DataFrame with the forecasts
+    future = pd.period_range(train.index[-1] + 1, periods=steps, freq="Q")
+
+    return pd.DataFrame(values, index=future, columns=train.columns)[TARGETS]
 
 if __name__ == "__main__":
     # 1. Connect to the database and build the quarterly dataset
