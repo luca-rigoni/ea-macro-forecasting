@@ -1,63 +1,71 @@
+"""Pseudo-out-of-sample evaluation of the AR, random walk, VAR and BVAR forecasts."""
+
+from functools import partial
+
 import pandas as pd
 
 from src.database import DB_PATH, connect
 from src.dataset import build_quarterly_dataset
 from src.evaluation import COVID, compute_rmse, pseudo_out_of_sample
-from src.models import ar_forecast, random_walk_forecast, var_forecast
+from src.models import ar_forecast, bvar_forecast, random_walk_forecast, var_forecast
+
+PRE_COVID_END = pd.Period("2019Q4", freq="Q")
+TIGHTNESS_GRID = [0.05, 0.1, 0.2, 0.5]
+NOTE = "(< 1: the first model outperforms the second)"
+
+
+def show(title: str, table: pd.DataFrame, note: str | None = None) -> None:
+    """Print a titled table of results."""
+    print(f"\n=== {title} ===")
+    print(table.round(3))
+    if note:
+        print(note)
+
+
+def pre_covid(eval_df: pd.DataFrame) -> pd.DataFrame:
+    """Keep forecasts made from origins up to 2019Q4, so no Covid quarters enter the estimation."""
+    return eval_df[eval_df["origin"] <= PRE_COVID_END]
 
 
 def main():
-    # 1. Opens the database connection and builds the quarterly dataset
     connection = connect(DB_PATH)
-    df = build_quarterly_dataset(connection)
+    dataset = build_quarterly_dataset(connection)
     connection.close()
 
-    print("Running pseudo out-of-sample evaluation...\n")
+    print("Running pseudo-out-of-sample evaluation...")
+    evals = {
+        "AR": pseudo_out_of_sample(dataset, ar_forecast),
+        "RW": pseudo_out_of_sample(dataset, random_walk_forecast),
+        "VAR": pseudo_out_of_sample(dataset, var_forecast),
+        "BVAR": pseudo_out_of_sample(dataset, bvar_forecast),
+    }
 
-    # 2. Generate out-of-sample forecasts for both models
-    eval_ar = pseudo_out_of_sample(df, ar_forecast)
-    eval_rw = pseudo_out_of_sample(df, random_walk_forecast)
-    eval_var = pseudo_out_of_sample(df, var_forecast)
+    # RMSE excluding Covid origins and targets (2020Q1-2021Q4)
+    rmse = {name: compute_rmse(ev, exclude=COVID) for name, ev in evals.items()}
+    # Same, keeping only origins up to 2019Q4
+    rmse_pre = {name: compute_rmse(pre_covid(ev), exclude=COVID) for name, ev in evals.items()}
 
-    # 3. Calculate the RMSE tables
-    rmse_ar_full = compute_rmse(eval_ar)
-    rmse_ar_nocovid = compute_rmse(eval_ar, exclude=COVID)
-    rmse_rw_nocovid = compute_rmse(eval_rw, exclude=COVID)
-    rmse_var_nocovid = compute_rmse(eval_var, exclude=COVID)
+    show("AR RMSE, Covid included", compute_rmse(evals["AR"]))
+    for name in ["AR", "VAR", "BVAR"]:
+        show(f"{name} RMSE, excluding Covid", rmse[name])
 
-    # 4. Calculate the RMSE ratio (Relative RMSE: AR / Random Walk)
-    relative_ar_rw = rmse_ar_nocovid / rmse_rw_nocovid
-    relative_var_ar = rmse_var_nocovid / rmse_ar_nocovid
+    show("AR / RW, excluding Covid", rmse["AR"] / rmse["RW"], NOTE)
+    show("VAR / AR, excluding Covid", rmse["VAR"] / rmse["AR"], NOTE)
+    show("BVAR / AR, excluding Covid", rmse["BVAR"] / rmse["AR"], NOTE)
+    show("BVAR / VAR, excluding Covid", rmse["BVAR"] / rmse["VAR"], NOTE)
 
-    # 5. Print the results
-    print("=== AR Model RMSE (Full Sample) ===")
-    print(rmse_ar_full.round(3))
-    print("\n" )
+    show("VAR / AR, origins up to 2019Q4", rmse_pre["VAR"] / rmse_pre["AR"], NOTE)
+    show("BVAR / AR, origins up to 2019Q4", rmse_pre["BVAR"] / rmse_pre["AR"], NOTE)
+    show("BVAR / VAR, origins up to 2019Q4", rmse_pre["BVAR"] / rmse_pre["VAR"], NOTE)
 
-    print("=== AR Model RMSE (Excluding COVID: 2020Q1 - 2021Q4) ===")
-    print(rmse_ar_nocovid.round(3))
-    print("\n" )
+    # Sensitivity of the BVAR to the overall tightness lambda
+    sensitivity = {}
+    for tightness in TIGHTNESS_GRID:
+        eval_lambda = pseudo_out_of_sample(dataset, partial(bvar_forecast, tightness=tightness))
+        sensitivity[tightness] = compute_rmse(eval_lambda, exclude=COVID) / rmse["AR"]
+    show("BVAR / AR by overall tightness (lambda), excluding Covid",
+         pd.concat(sensitivity, names=["tightness"]), NOTE)
 
-    print("=== VAR Model RMSE (Excluding COVID: 2020Q1 - 2021Q4) ===")
-    print(rmse_var_nocovid.round(3))
-    print("\n" )
-
-    print("=== Relative RMSE: AR / Random Walk (Excluding COVID) ===")
-    print(relative_ar_rw.round(3))
-    print("(Values < 1.000 indicate AR outperforms Random Walk)\n\n")
-
-    print("=== Relative RMSE: VAR / AR (Excluding COVID) ===")
-    print(relative_var_ar.round(3))
-    print("(Values < 1.000 indicate VAR outperforms AR)\n\n")
-
-
-#6 . Additional comparison of AR and VAR models before COVID to see if VAR outperforms AR in the pre-pandemic period
-    pre_covid = pd.Period("2019Q4", freq="Q")
-    ar_pre = compute_rmse(eval_ar[eval_ar["origin"] <= pre_covid], exclude=COVID)
-    var_pre = compute_rmse(eval_var[eval_var["origin"] <= pre_covid], exclude=COVID)
-    print("=== Relative RMSE: VAR / AR (Pre-COVID) ===")
-    print((var_pre / ar_pre).round(3))
-    print("(Values > 1.000 indicate AR outperforms VAR, suggesting VAR being less effective due to overfitting)\n\n")
 
 if __name__ == "__main__":
     main()
