@@ -1,4 +1,4 @@
-"""Forecasting models: AR benchmark (VAR and BVAR to follow)."""
+"""Forecasting models: random walk, AR, VAR, BVAR with a Minnesota prior and random forest."""
 
 import pandas as pd
 import numpy as np
