@@ -7,7 +7,7 @@ import pandas as pd
 from src.database import DB_PATH, connect
 from src.dataset import build_quarterly_dataset
 from src.evaluation import COVID, compute_rmse, pseudo_out_of_sample
-from src.models import ar_forecast, bvar_forecast, random_walk_forecast, var_forecast
+from src.models import ar_forecast, bvar_forecast, random_walk_forecast, rf_forecast, var_forecast
 
 PRE_COVID_END = pd.Period("2019Q4", freq="Q")
 TIGHTNESS_GRID = [0.05, 0.1, 0.2, 0.5]
@@ -38,6 +38,7 @@ def main():
         "RW": pseudo_out_of_sample(dataset, random_walk_forecast),
         "VAR": pseudo_out_of_sample(dataset, var_forecast),
         "BVAR": pseudo_out_of_sample(dataset, bvar_forecast),
+        "RF": pseudo_out_of_sample(dataset, rf_forecast),
     }
 
     # RMSE excluding Covid origins and targets (2020Q1-2021Q4)
@@ -46,7 +47,7 @@ def main():
     rmse_pre = {name: compute_rmse(pre_covid(ev), exclude=COVID) for name, ev in evals.items()}
 
     show("AR RMSE, Covid included", compute_rmse(evals["AR"]))
-    for name in ["AR", "VAR", "BVAR"]:
+    for name in ["AR", "VAR", "BVAR", "RF"]:
         show(f"{name} RMSE, excluding Covid", rmse[name])
 
     show("AR / RW, excluding Covid", rmse["AR"] / rmse["RW"], NOTE)
@@ -66,6 +67,8 @@ def main():
     show("BVAR / AR by overall tightness (lambda), excluding Covid",
          pd.concat(sensitivity, names=["tightness"]), NOTE)
 
+    show("RF / AR, excluding Covid", rmse["RF"] / rmse["AR"], NOTE)
+    show("RF / AR, origins up to 2019Q4", rmse_pre["RF"] / rmse_pre["AR"], NOTE)
 
 if __name__ == "__main__":
     main()

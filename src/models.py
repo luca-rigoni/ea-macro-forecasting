@@ -4,6 +4,7 @@ import pandas as pd
 import numpy as np
 from statsmodels.tsa.ar_model import AutoReg, ar_select_order
 from statsmodels.tsa.api import VAR
+from sklearn.ensemble import RandomForestRegressor
 
 from src.database import connect, DB_PATH
 from src.dataset import build_quarterly_dataset
@@ -26,6 +27,11 @@ OWN_LAG_PRIOR_MEAN= {
     "unemployment": 1.0,
     "euribor3m": 1.0,
 }
+
+# Random forest: lags of every variable used as features, number of trees, seed for reproducibility
+RF_LAGS = 4
+RF_TREES = 300
+RF_SEED = 0
 
 TARGETS = ["gdp_growth", "inflation"]
 
@@ -192,6 +198,32 @@ def bvar_forecast(train: pd.DataFrame, steps: int, lags: int = BVAR_LAGS, tightn
     forecast_df = pd.DataFrame(forecasts, index=future, columns=train.columns)
 
     return forecast_df[TARGETS]
+
+def rf_features(data: pd.DataFrame, lags: int = RF_LAGS) -> pd.DataFrame:
+    """Features known at each date t: the values of every variable at t, t-1, ..., t-(lags-1)."""
+    return pd.concat(
+        {f"{col}_lag{l}": data[col].shift(l) for col in data.columns for l in range(lags)},
+        axis=1,
+    )
+
+
+def rf_forecast(train: pd.DataFrame, steps: int, lags: int = RF_LAGS, n_trees: int = RF_TREES) -> pd.DataFrame:
+    """Direct multi-step random forest forecasts: one forest per target variable and horizon."""
+    features = rf_features(train, lags)
+    latest = features.iloc[[-1]]  # what we know at the forecast origin
+
+    future = pd.period_range(train.index[-1] + 1, periods=steps, freq="Q")
+    forecasts = pd.DataFrame(index=future, columns=TARGETS, dtype=float)
+
+    for h in range(1, steps + 1):
+        for target in TARGETS:
+            # Pair the features at t with the target at t+h, and drop incomplete rows
+            sample = features.assign(y=train[target].shift(-h)).dropna()
+            model = RandomForestRegressor(n_estimators=n_trees, random_state=RF_SEED, n_jobs=-1)
+            model.fit(sample.drop(columns="y"), sample["y"])
+            forecasts.loc[future[h - 1], target] = model.predict(latest)[0]
+
+    return forecasts
 
 
 if __name__ == "__main__":
