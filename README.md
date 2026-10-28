@@ -139,7 +139,7 @@ tests/      automated tests
 
 ## Use of AI tools
 
-The project was developed with the help of an AI assistant (Anthropic's Claude), used for explanations of the methods, code review and debugging, and for drafting parts of the code and of this README. Modelling choices, checks and interpretation of the results are my own.
+The project was developed with the help of an AI assistant, used for explanations of the methods, code review and debugging, and for drafting parts of the code and of this README. Modelling choices, checks and interpretation of the results are my own.
 
 ## Author
 
